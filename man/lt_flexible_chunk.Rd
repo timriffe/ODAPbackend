@@ -70,7 +70,7 @@ Deaths <- c(8674,1592,618,411,755,1098,1100,1357,
             2887,2351,1500,900,500,300)
 
 Age = c(0, 1, seq(5, 100, by = 5))
-data_in <- tibble(Age,Deaths,Exposures)
+data_in <- tibble(Age,Deaths,Exposures, Sex = "f")
 data_out <- 
   lt_flexible(data_in,
               OAnew     = 100,

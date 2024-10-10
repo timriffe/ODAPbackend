@@ -35,7 +35,7 @@ lt_flexible(
 
 \item{SRB}{numeric. the sex ratio at birth (boys / girls), default \code{1.05}}
 
-\item{Sex}{character. Either \code{"m"} for males, \code{"f"} for females (default).}
+\item{Sex}{character. Either \code{"m"} for males, \code{"f"} for females. This variable should be preswent in the dataframe. If there is more than pne sex in the data, then the lifetable will be calculazted for each sex present.}
 
 \item{a0rule}{character. Either \code{"ak"} (default) or \code{"cd"}.}
 

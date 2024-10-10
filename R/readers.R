@@ -84,23 +84,35 @@ read_data <- function(user_file, skip = 0) {
 #' @importFrom dplyr cur_group_id mutate group_by_at
 #' @export
 create_groupid <- function(data, keys){
+  if (length(keys) == 0) {
+    data$`.id` <- 1
+    data$`.id_label` <- "All"
+  }
   data |> 
     group_by_at(keys) |> 
-    mutate(.id = cur_group_id(), .before = 1)
+    mutate(
+      .id = cur_group_id(),
+      `.id_label` = paste0(cur_group(), collapse = " - "),
+      .before = 1
+    ) %>%
+    ungroup()
 }
 
 #' @title check_groupid
 #' @description Checks to make sure `.id` column plus `Age` indeed completely define all strata present in the data.
 #' @param data `data.frame`-like object
 #' @return logical TRUE if strata completely defined.
-#' @importFrom dplyr group_by summarize
+#' @importFrom dplyr group_by summarize n
 #' @export
 check_groupid <- function(data){
+  
   stopifnot(".id" %in% colnames(data))
+  
   check <-
     data |> 
-    group_by(.id, Age) |> 
+    group_by(.data$.id, .data$Age) |> 
     summarize(n = n(), .groups = "drop")
+  
   all(check$n == 1)
 }
 

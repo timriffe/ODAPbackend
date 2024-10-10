@@ -32,7 +32,7 @@ smooth_flexible(
 
 \item{constrain_infants}{logical, if age 0 is a separate age class, shall we constrain its proportion within the age group 0-5 in the output? Default \code{TRUE}.}
 
-\item{Sex}{character. Either \code{"m"} for males, \code{"f"} for females, or \code{"t"} for total (defualt).}
+\item{Sex}{character. Either \code{"m"} for males, \code{"f"} for females, or \code{"t"}. This variable should exist in the dataframe. If more than 1 sex is present, then graduation will be done for all the sexes present in the data}
 }
 \value{
 data_out. A list of lists. For each sepate group specified by the .id column the function will generate a list that will contain 2 lists: data and figures. Data tibble with two numeric columns - smoothed counts for the chosen variable and \code{Age} - chosen age grouping and one character column indicating .id groups. And figures 2 dataframes - data_adjusted and data_orioginal correspodnign to the dataframes withpre and post old age mortality adjustment and a figure visualizing the corresponding differences.
@@ -43,7 +43,8 @@ Smoothes population or death counts using the variaety of methods from DemoTools
 \examples{
 data(pop1m_ind, package = "DemoTools")
 data_in <- data.frame(Exposures = pop1m_ind,
-                      Age       = 0:100)
+                      Age       = 0:100,
+                      Sex = "f")
                       
 ex1 <- smooth_flexible(
 data_in, 
@@ -52,8 +53,7 @@ rough_method = "auto",
 fine_method  = "none", 
 constrain_infants = TRUE, 
 age_out = "abridged", 
-u5m     = NULL,
-Sex     = "t")
+u5m     = NULL)
 
 
 }
