@@ -26,32 +26,41 @@
 #' fine_method  = "none", 
 #' constrain_infants = TRUE, 
 #' age_out = "abridged", 
-#' u5m     = NULL,
+#' u5m     = .1,
 #' Sex     = "t")
 #' 
+#' ex1$data_out
+#' ex1$figures
+#' ex1$arguments
 #' 
+
 smooth_flexible <- function(data_in,
-                                  variable      = "Deaths",
-                                  age_out       = c("single", "abridged", "5-year"),
-                                  fine_method   = c("auto", "none", "sprague",
-                                                    "beers(ord)", "beers(mod)",
-                                                    "grabill", "pclm", "mono",
-                                                    "uniform"),
-                                  rough_method  = c("auto", "none", "Carrier-Farrag",
-                                                    "KKN", "Arriaga", "United Nations",
-                                                    "Strong", "Zigzag"),
-                                  u5m           = NULL,
-                                  constrain_infants = TRUE,
-                                  Sex) {
+                            variable      = "Deaths",
+                            age_out       = c("single", "abridged", "5-year"),
+                            fine_method   = c("auto", "none", "sprague",
+                                              "beers(ord)", "beers(mod)",
+                                              "grabill", "pclm", "mono",
+                                              "uniform"),
+                            rough_method  = c("auto", "none", "Carrier-Farrag",
+                                              "KKN", "Arriaga", "United Nations",
+                                              "Strong", "Zigzag"),
+                            u5m               = NULL,
+                            constrain_infants = TRUE,
+                            Sex = "t") {
+  
+  f_args <- capture_args()
   
   if (!(".id" %in% colnames(data_in))) {
     data_in <- data_in |>
       mutate(.id = "all")
   }
   
-  
   id <-  unique(data_in$.id)
+  # if there is a single subset then use sex and is defauдt for total
   
+  if (!"Sex" %in% colnames(data_in)){
+    data_in$Sex <- Sex
+  }
   
   group_func <- function(group_data) {
     
@@ -69,36 +78,27 @@ smooth_flexible <- function(data_in,
     )
   }
   
-  
   # Process each group separately
   results <- data_in |>
     mutate(Sex = substr(Sex, 1, 1), Sex = tolower(Sex)) |>
     group_split(.id, .keep = TRUE) |>
     map(~ group_func(.x))
   
+    smoothed_data <- map(results, "data") |>
+      set_names(id) |>
+      bind_rows(.id = ".id")
+    
+
   # Extract smoothed data and figures from each result
-  smoothed_data <- map(results, "data") |>
-    set_names(id) |>
-    bind_rows(.id = ".id")
   
-  figures       <- map(results, "figure") |>
+  figures <- map(results, "figure") |>
     set_names(id)
   
-  return(list(data    = smoothed_data, 
-              figures = figures))
+  return(list(data_out  = smoothed_data, 
+              figures   = figures,
+              arguments = f_args))
 }
 
-
-
-# data_out <- smooth_flexible_chunk(
-#   data_in, 
-#   variable     = "Deaths", 
-#   rough_method = "auto",
-#   fine_method  = "pclm", 
-#   constrain_infants = TRUE, 
-#   age_out = "single", 
-#   u5m     = .1
-# )
 #' @title graduate_auto
 #' @description Smooth population or death counts with moving averages. The method was adopted from the "Method protocol for the evaluation of census population data by age and sex" paragraph 5.
 #' @param data_in tibble. A tibble with two numeric columns - population or death counts with supported names: `Pop`, `Population`, `Exp`, `Exposures` or `Deaths`, and corresponding `Age` - provided in single age intervals, 5-year age intervals, or abridged age format e.g. with ages 0, 1-4, 5-9 etc.
@@ -120,82 +120,36 @@ smooth_flexible <- function(data_in,
 #' 
 #' data_in <- read.csv(fpath)
 #' 
-#' ex1 <- graduate_auto(
-#'data_in,
-#'age_out  = "5-year",
-#'variable = "Deaths",
-#'u5m      = NULL,
-#'Sex      = "t",
-#'constrain_infants = FALSE)
-#'
-#' ex2 <- graduate_auto(
-#'data_in,
-#'age_out  = "abridged",
-#'variable = "Exposures",
-#'u5m      = NULL,
-#'Sex      = "t",
-#'constrain_infants = FALSE
-#')
-#'
-#' ex3 <- graduate_auto(
-#'data_in,
-#'age_out  = "single",
-#'variable = "Exposures",
-#'u5m      = NULL,
-#'Sex      = "t",
-#'constrain_infants = TRUE
-#')
-# ---------------------------------------------------------------------- #
-# 3 types of test data
-# single years 
-# data_in <- tibble(Pop = pop1m_ind,
-#                   Age = 0:100,
-#                   Death = pop1m_ind,
-#                   Exposures = pop1m_ind)
+#' data_in <- tibble(Pop = pop1m_ind,
+#'                   Age = 0:100,
+#'                   Death = pop1m_ind,
+#'                   Exposures = pop1m_ind)
+#' 
+#' # 5-years
+#' data_in <- tibble(Pop = groupAges(pop1m_ind, N = 5),
+#'                   Age = seq(0, 100, 5))
+#' 
+#' # abridged
+#' data_in <- tibble(Pop1 = c(groupAges(pop1m_ind, N = 5)[1] * c(0.4, 0.6),
+#'                            groupAges(pop1m_ind, N = 5)[-1]),
+#'                 Age = c(0, 1, seq(5, 100, 5)))
+#' 
+#' graduate_auto(data_in,
+#'               age_out = "single",
+#'               variable = "Exposures",
+#'               constrain_infants = TRUE)
+#' 
+#' graduate_auto(data_in,
+#'               age_out = "5-year",
+#'               variable = "Pop",
+#'               constrain_infants = TRUE)
+#' 
+#' graduate_auto(data_in,
+#'               age_out = "abridged",
+#'               variable = "Pop1",
+#'               constrain_infants = TRUE)
+#' 
 
-# # 5-years
-# data_in <- tibble(Pop = groupAges(pop1m_ind, N = 5),
-#                   Age = seq(0, 100, 5))
-# 
-# # abridged
-# data_in <- tibble(Pop = c(groupAges(pop1m_ind, N = 5)[1] * c(0.4, 0.6),
-#                           groupAges(pop1m_ind, N = 5)[-1]),
-#                   Age = c(0, 1, seq(5, 100, 5)))
-# 
-# # Are these the same?
-# graduate_auto(data_in,
-#               age_out = "single",
-#               variable = "Exposures",
-#               constrain_infants = TRUE)
-# 
-# graduate_auto(data_in,
-#               age_out = "single",
-#               variable = "Exposures",
-#               constrain_infants = FALSE)
-# 
-# # good
-# graduate_auto(data_in,
-#               age_out = "5-year",
-#               variable = "Exposures",
-#               constrain_infants = TRUE)
-# 
-# 
-# graduate_auto(data_in,
-#               age_out = "5-year",
-#               variable = "Exposures",
-#               constrain_infants = FALSE)
-# 
-# # good
-# graduate_auto(data_in,
-#               age_out = "abridged",
-#               variable = "Exposures",
-#               constrain_infants = TRUE)
-# 
-# 
-# graduate_auto(data_in,
-#               age_out = "abridged",
-#               variable = "Exposures",
-#               constrain_infants = FALSE)
 graduate_auto <- function(data_in,
                           age_out  = c("single", "abridged", "5-year"),
                           variable = NULL,
@@ -203,6 +157,7 @@ graduate_auto <- function(data_in,
                           Sex      = c("t", "f", "m"),
                           constrain_infants = TRUE) {
   
+  f_args  <- capture_args()
   age_out <- match.arg(age_out, c("single", "abridged", "5-year"))
   Sex     <- match.arg(Sex,     c("t", "f", "m"))
   
@@ -501,7 +456,6 @@ graduate_auto <- function(data_in,
     
   }
   
-  
   final_data_single <- is_single(data_out$Age)
   
   # (1) graduate_mono
@@ -537,7 +491,8 @@ graduate_auto <- function(data_in,
     
   }
   
-  return(data_out)
+  return(list(data_out = data_out,
+              arguments = f_args))
   
 }
 
@@ -679,7 +634,7 @@ graduate_auto_5 <- function(dat_5, variable) {
 #' data_in <- data.frame(Exposures = pop1m_ind,
 #'                       Age       = 0:100)
 #'                       
-#' ex1 <- smooth_flexible(
+#' ex1 <- smooth_flexible_chunk(
 #' data_in, 
 #' variable     = "Exposures",
 #' rough_method = "auto",
@@ -688,20 +643,26 @@ graduate_auto_5 <- function(dat_5, variable) {
 #' age_out = "abridged", 
 #' u5m     = NULL,
 #' Sex     = "t")
-#'
+#' ex1$data
+#' ex1$figure
+#' ex1$arguments
+
 smooth_flexible_chunk <- function(data_in,
-                            variable     = "Deaths",
-                            age_out      = c("single", "abridged", "5-year"),
-                            fine_method  = c("auto", "none", "sprague",
-                                             "beers(ord)", "beers(mod)",
-                                             "grabill", "pclm", "mono",
-                                             "uniform"),
-                            rough_method = c("auto", "none", "Carrier-Farrag",
-                                             "KKN", "Arriaga", "United Nations",
-                                             "Strong", "Zigzag"),
-                            u5m = NULL,
-                            Sex = c("t", "f", "m"),
-                            constrain_infants = TRUE) {
+                                  variable     = "Deaths",
+                                  age_out      = c("single", "abridged", "5-year"),
+                                  fine_method  = c("auto", "none", "sprague",
+                                                   "beers(ord)", "beers(mod)",
+                                                   "grabill", "pclm", "mono",
+                                                   "uniform"),
+                                  rough_method = c("auto", "none", "Carrier-Farrag",
+                                                   "KKN", "Arriaga", "United Nations",
+                                                   "Strong", "Zigzag"),
+                                  u5m = NULL,
+                                  Sex = c("t", "f", "m"),
+                                  constrain_infants = TRUE) {
+  
+  f_args <- capture_args()
+  
   data_orig <- data_in
   # ensure just one of each method is chosen. 
   # rough auto is compatible with a non-auto fine,
@@ -750,7 +711,6 @@ smooth_flexible_chunk <- function(data_in,
     data1 <- data_in
     
   }
-  
   
   #--------------------------------#
   # regularize no-standard ages    #
@@ -801,7 +761,13 @@ smooth_flexible_chunk <- function(data_in,
     
     if(age_out == age_in) {
       
-      return(data_in)
+      figure <- plot_smooth_compare(data_in = data_orig,
+                                   data_out = data_in,
+                                   variable = variable)
+      
+      return(list(data      = data_orig,
+                  figure    = figure,
+                  arguments = f_args))
       
     } 
     
@@ -826,7 +792,13 @@ smooth_flexible_chunk <- function(data_in,
     data_out  <- tibble(Age = names2age(value_out),
                         !!variable := value_out)
     
-    return(data_out)
+    figure <- plot_smooth_compare(data_in = data_orig,
+                                  data_out = data_out,
+                                  variable = variable)
+    
+    return(list(data      = data_out,
+                figure    = figure,
+                arguments = f_args))
     
   }
   
@@ -848,7 +820,7 @@ smooth_flexible_chunk <- function(data_in,
                            variable = variable,
                            u5m      = u5m,
                            Sex      = Sex,
-                           constrain_infants = constrain_infants)
+                           constrain_infants = constrain_infants)$data_out
     
     # regroup to 5, overrides previous one
     data5 <- data1 |> 
@@ -863,6 +835,7 @@ smooth_flexible_chunk <- function(data_in,
   if(rough_method %in% c("Carrier-Farrag", "KKN", "Arriaga",
                          "United Nations", "Strong", "Zigzag")) {
     
+    # CHECK THIS
     data5 <- data5 |>
       mutate(!!variable := smooth_age_5(Value  = !!sym(variable),
                                         Age    = Age,
@@ -876,7 +849,13 @@ smooth_flexible_chunk <- function(data_in,
   
   if(fine_method == "none" & age_out == "5-year") {
     
-    return(data5)
+    figure <- plot_smooth_compare(data_in = data_orig,
+                                  data_out = data5,
+                                  variable = variable)
+    
+    return(list(data      = data5,
+                figure    = figure,
+                arguments = f_args))
     
   }
   
@@ -948,7 +927,7 @@ smooth_flexible_chunk <- function(data_in,
                              variable = variable,
                              u5m      = u5m,
                              Sex      = Sex,
-                             constrain_infants = constrain_infants)
+                             constrain_infants = constrain_infants)$data_out
     }
     
     data5 <- data5 |> 
@@ -964,12 +943,14 @@ smooth_flexible_chunk <- function(data_in,
     
   }
   
+  # THIS ONE CHECK
   if(fine_method %in% c("sprague", "beers(ord)", "beers(mod)", 
                         "grabill", "pclm", "mono", "uniform")) {
     value  <- data5 |> 
       pull(!!sym(variable))
     age    <- data5 |> 
       pull(Age)
+    # THIS ONE DOES NOT WORK WITH NEGATIVES
     value1 <- graduate(Value  = value,
                        Age    = age,
                        method = fine_method,
@@ -1164,9 +1145,9 @@ smooth_flexible_chunk <- function(data_in,
                                 data_out = data_out,
                                 variable = variable)
   
-  
-  return(list(data = data_out,
-             figure = figure))
+  return(list(data      = data_out,
+              figure    = figure,
+              arguments = f_args))
   
 }
 
@@ -1185,17 +1166,25 @@ smooth_flexible_chunk <- function(data_in,
 #' data(pop1m_ind, package = "DemoTools")
 #' data_in <- data.frame(Exposures = pop1m_ind,
 #'                       Age = 0:100)
-#'                       
+#' 
 #' data_out <- smooth_flexible(
-#'                data_in, 
-#'                variable     = "Exposures", 
-#'                rough_method = "auto",
-#'                fine_method  ="pclm", 
-#'                constrain_infants = TRUE, 
-#'                age_out = "5-year", 
-#'                u5m     = .1,
-#'                Sex     = "t")
-#' print(data_out$figure$figure)
+#'   data_in,
+#'   variable     = "Exposures",
+#'   rough_method = "auto",
+#'   fine_method  ="pclm",
+#'   constrain_infants = TRUE,
+#'   age_out = "5-year",
+#'   u5m     = .1,
+#'   Sex     = "t")
+#' 
+#' results <- plot_smooth_compare(data_in, 
+#' data_out$data_out, 
+#' variable = "Exposures")
+#' 
+#' results$data_adjusted
+#' results$data_original
+#' results$figure
+
 plot_smooth_compare <- function(data_in, data_out, variable) {
   
   data_in <- data_in |> 
@@ -1228,7 +1217,6 @@ plot_smooth_compare <- function(data_in, data_out, variable) {
     labs(title = paste("Original (black) and adjusted (red)", variable, "data"),
          x = "Age",
          y = variable)
-  
   
   return(lst(figure, 
              data_adjusted = data_out,

@@ -25,45 +25,57 @@
 #' ex numeric. Age-specific remaining life expectancy.
 #' .id character A group indicator for which the results will be generated. In case of missing the .id columnwill return `all`
 #' @importFrom dplyr case_when reframe first
+#' @importFrom purrr set_names
 #' @importFrom DemoTools is_single lt_abridged age2int lt_abridged2single lt_single_mx lt_single2abridged is_abridged
 #' @importFrom rlang .data
 #' @export
 #' @examples
 #' \dontrun{
-#' library(tibble)
-#' Exposures <- c(100958,466275,624134,559559,446736,370653,301862,249409,
-#' 247473,223014,172260,149338,127242,105715,79614,53660,
-#' 31021,16805,8000,4000,2000,1000)
+#' library(tidyr)
+#' library(dplyr)
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000, 
+#'                1000)
 #' 
-#' Deaths <- c(8674,1592,618,411,755,1098,1100,1357,
-#'             1335,3257,2200,4023,2167,4578,2956,4212,
-#'             2887,2351,1500,900,500,300)
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
 #' 
-#' sex <- c("f", "m")
+#' sex     <- c("f", "m")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures)
+#' dt      <- rpois(n = 22, lambda = 1000)
+#' d1      <- rpois(n = 22, lambda = 100000)
 #' 
-#' Age = c(0, 1, seq(5, 100, by = 5))
-#' data_in <- tibble(Age,Deaths,Exposures)
-#' dt <- rpois(n = 22, lambda = 1000)
-#' d1 <- rpois(n = 22, lambda = 100000)
-#' 
-#' data_in <- expand_grid(sex, data_in) %>% 
-#'   mutate(Deaths = ifelse(sex == "f", dt, Deaths),
-#'          Exposures = ifelse(sex == "f", d1, Exposures)) %>% 
-#'   mutate(.id = sex) %>% 
-#'    mutate(Sex = sex) %>% 
+#' data_in <- expand_grid(sex, data_in) |>
+#'   mutate(Deaths    = ifelse(sex == "f", dt, Deaths),
+#'          Exposures = ifelse(sex == "f", d1, Exposures)) |>
+#'   mutate(.id = sex) |>
+#'   mutate(Sex = sex) |>
 #'   dplyr::select(-sex)
-#'
 #' 
-#' data_out <- smooth_flexible(
-#'   data_in, 
-#'   variable     = "Deaths", 
-#'   rough_method = "auto",
-#'   fine_method  = "pclm", 
-#'   constrain_infants = TRUE, 
-#'   age_out = "single", 
-#'   u5m     = .1
+#' data_out <- lt_flexible(
+#'   data_in,
+#'   OAnew      = 100,
+#' OAnew      = 100,
+#' age_out    = "single",
+#' extrapFrom = 80,
+#' extrapFit  = NULL,  # Default NULL, computed later
+#' extrapLaw  = NULL,
+#' radix      = 1e+05,
+#' SRB        = 1.05,
+#' a0rule     = "Andreev-Kingkade",
+#' axmethod   = "UN (Greville)",
+#' Sex = "t"
 #' )
-#' }
+#' 
+#' data_out$data
+#' data_out$arguments
+#' data_out$figures$f
+#' data_out$figures$m
+#' 
+
 lt_flexible <- function(data_in,
                         OAnew      = 100,
                         age_out    = "single",
@@ -72,9 +84,11 @@ lt_flexible <- function(data_in,
                         extrapLaw  = NULL,
                         radix      = 1e+05,
                         SRB        = 1.05,
-                        Sex        = "t",
                         a0rule     = "Andreev-Kingkade",
-                        axmethod   = "UN (Greville)") {
+                        axmethod   = "UN (Greville)",
+                        Sex = "t") {
+  
+  f_args <- capture_args()
   
   data_in <- data_in |>
     mutate(Sex = substr(Sex, 1, 1),
@@ -91,6 +105,10 @@ lt_flexible <- function(data_in,
     extrapFit <- unique(data_in$Age)[unique(data_in$Age) >= 60]
   }
   
+  if (!"Sex" %in% colnames(data_in)){
+    data_in$Sex <- Sex
+  }
+  
   data_out <- data_in |>
     reframe(
       lt_flexible_chunk(data_in    = .data, 
@@ -104,9 +122,11 @@ lt_flexible <- function(data_in,
                         a0rule     = a0rule,
                         axmethod   = axmethod
       ), .by = .id
-    )
+    ) |>
+    set_names(c(".id", "data"))
   
-  return(data_out)
+  return(list(data_out  = data_out,
+              arguments = f_args))
 }
 
 # [ ] allow lx, nMx, nqx inputs
@@ -143,7 +163,6 @@ lt_flexible <- function(data_in,
 #' @export
 #' @examples
 #' \dontrun{
-#' library(tibble)
 #' Exposures <- c(100958,466275,624134,559559,446736,370653,301862,249409,
 #' 247473,223014,172260,149338,127242,105715,79614,53660,
 #' 31021,16805,8000,4000,2000,1000)
@@ -152,21 +171,25 @@ lt_flexible <- function(data_in,
 #'             1335,3257,2200,4023,2167,4578,2956,4212,
 #'             2887,2351,1500,900,500,300)
 #'
-#'Age = c(0, 1, seq(5, 100, by = 5))
-#'data_in <- tibble(Age,Deaths,Exposures)
-#' data_out <- 
-#'   lt_flexible(data_in,
-#'               OAnew     = 100,
-#'               age_out   = "single",  
-#'               extrapFrom = 80,
-#'               extrapFit = Age[Age >= 60], 
-#'               radix     = 1e+05,
-#'               extrapLaw = NULL,
-#'               SRB       = 1.05,
-#'               a0rule    = "ak",
-#'               axmethod  = "un",
-#'               Sex       = first(Sex))
+#' Age = c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age,Deaths,Exposures)
+#' data_out <-
+#'   lt_flexible_chunk(data_in,
+#'                     OAnew     = 100,
+#'                     age_out   = "single",
+#'                     extrapFrom = 80,
+#'                     extrapFit = Age[Age >= 60],
+#'                     radix     = 1e+05,
+#'                     extrapLaw = NULL,
+#'                     SRB       = 1.05,
+#'                     a0rule    = "ak",
+#'                     axmethod  = "un",
+#'                     Sex       = "t")
+#' 
+#' 
+#' data_out$data_out
 #' }
+
 lt_flexible_chunk <- function(
     data_in,
     Sex,
@@ -180,6 +203,11 @@ lt_flexible_chunk <- function(
     a0rule     = "Andreev-Kingkade",
     axmethod   = "UN (Greville)") {
   
+  f_args <- capture_args()
+  
+  Deaths    <- data_in$Deaths
+  Exposures <- data_in$Exposures
+  Age       <- data_in$Age
   
   a0rule <- case_match(a0rule,
                        "Andreev-Kingkade"  ~ "ak",
@@ -273,12 +301,14 @@ lt_flexible_chunk <- function(
                     "m" ~ "Males",
                     "f" ~ "Females",
                     "b" ~ "Total")
-  # 
-  # # Add sex column to output
+   
+  # Add sex column to output
   data_out <- data_out |>
     mutate(Sex = Sex, .before = 1)
   
-  return(data_out)
+  return(list(data_out  = data_out,
+              arguments = f_args))
+  
 }
 
 #' lt_plot
@@ -295,6 +325,12 @@ lt_plot <- function(data_in,
                     data_out, 
                     extrapFrom = extrapFrom){
   
+  data_out <- data_out$data_out %>%
+    mutate(ind = map_lgl(data, ~ is.data.frame(.x))) %>% 
+    filter(ind == TRUE) %>% 
+    dplyr::select(-ind) %>% 
+    unnest(data)
+  
   if (!(".id" %in% colnames(data_out))){
     data_out <- data_out |>
       mutate(.id = "all")
@@ -307,7 +343,8 @@ lt_plot <- function(data_in,
   
   plots <- data_out |>
     group_split(.id, .keep = TRUE)|>
-    map(~ plot_lifetable(.x))
+    map(~ plot_lifetable(.x)) %>% 
+    set_names(id)
   
   # sorry JC, forgot this!
   d_in <-  data_in |>
@@ -333,8 +370,8 @@ lt_plot <- function(data_in,
   plots$nMx <- data$new
   
   return(plots)
+  
 }
-
 
 # TODO: lt_summary() should create a table of useful summary statistics from the lifetable:
 # e0, e65, 45q15, sd, IQR (from LifeIneq), mode (use Paola Vasquez' shorthand formula rather than spline method)
@@ -362,30 +399,34 @@ lt_plot <- function(data_in,
 #' @examples
 #' \dontrun{
 #' Exposures <- c(100958,466275,624134,559559,446736,370653,301862,249409,
-#'                247473,223014,172260,149338,127242,105715,79614,53660,
-#'                31021,16805,8000,4000,2000,1000)
+#' 247473,223014,172260,149338,127242,105715,79614,53660,
+#' 31021,16805,8000,4000,2000,1000)
 #' 
 #' Deaths <- c(8674,1592,618,411,755,1098,1100,1357,
 #'             1335,3257,2200,4023,2167,4578,2956,4212,
 #'             2887,2351,1500,900,500,300)
-#'
 #' Age = c(0, 1, seq(5, 100, by = 5))
-#' data_out <- 
+#' 
+#' data_in <- data.frame(Age, Deaths, Exposures)
+#' 
+#' data_out <-
 #'   lt_flexible(data_in,
 #'               OAnew     = 100,
-#'               age_out   = "single",  
+#'               age_out   = "single",
 #'               extrapFrom = 80,
-#'               extrapFit = NULL, 
+#'               extrapFit = NULL,
 #'               radix     = 1e+05,
 #'               extrapLaw = NULL,
-#'               SRB       = 1.05,
+#'              SRB       = 1.05,
 #'               a0rule    = "ak",
 #'               axmethod  = "un")
-#'               
+#' 
 #' lt_summary(data_out)
 #' }
-#' 
+
 lt_summary <- function(data_out){
+  
+  data_out <- data_out$data_out
   
   if (!(".id" %in% colnames(data_out))){
     data_out <- data_out |>
@@ -398,31 +439,29 @@ lt_summary <- function(data_out){
   return(out)
 }
 
-
 # TODO: add column called 'label'
-lt_summary_chunk <- function(data_out) { 
+lt_summary_chunk <- function(data_out) {
   
   e0  <- data_out$ex[data_out$Age == 0]
   e65 <- data_out$ex[data_out$Age == 65]
-  S <- ineq_sd(age = data_out$Age, 
-               dx = data_out$ndx, 
-               ex = data_out$ex, 
-               ax = data_out$nAx)
+  S   <- ineq_sd(age = data_out$Age,
+                 dx  = data_out$ndx,
+                 ex  = data_out$ex,
+                 ax  = data_out$nAx)
   
-
   IQR        <- ineq_iqr(age = data_out$Age, lx = data_out$lx, lower = 0.25,  upper = 0.75)
-
+  
   # TR: corrected this; you were using ndx before, we only need for age 0...
   median_age <- ineq_quantile(age = data_out$Age, lx = data_out$lx, quantile = 0.5)[1]
   mod_age    <- modal_age(data_out)
-
+  
   # survived to age 45 AND died at age 60
   # q15_45 <- (1 - data_out$nqx[data_out$Age == 45]) * data_out$nqx[data_out$Age == 60]
   # TR: nope 45q15 means probability of dying before age 60, conditional
   # on survival to age 15, often denoted as
   # ${}_{45}q_{15}$, i.e. where 45 is N = interval width
   # I switched it to 20 - 65 so 45q20
-
+  
   l20     <- data_out$lx[data_out$Age == 20]
   l65     <- data_out$lx[data_out$Age == 65]
   p_20_65 <- l65 / l20
@@ -436,7 +475,7 @@ lt_summary_chunk <- function(data_out) {
                 sd10 = S[11],
                 IQR,
                 q_20_65) |> 
-    pivot_longer(everything(),names_to = "measure", values_to = "value") |> 
+    pivot_longer(everything(), names_to = "measure", values_to = "value") |> 
     mutate(label = c("e_0","Median","Mode","e_65","\\sigma_0","\\sigma_{10}","IQR","{}_{45}q_{20}"),
            message = c("life expectancy at birth",
                        "median age at death",
@@ -447,11 +486,9 @@ lt_summary_chunk <- function(data_out) {
                        "interquartile range of age at death distribution",
                        "conditional probability of death between ages 20 and 65"))
   
-  
-  
   return(out)
-  }
-
+  
+}
 
 # helper function that calculates the modal age at death
 #  Formula for mode from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3000019/ Appendix A, A2
@@ -460,8 +497,8 @@ modal_age <- function(data_out) {
   
   # we have to remove the data from the first age, since many 
   # deaths are registered at this age.
-  Age  <- data_out$Age[-1]
-  dx   <- data_out$ndx[-1]
+  Age      <- data_out$Age[-1]
+  dx       <- data_out$ndx[-1]
   
   ind  <- which.max(dx)
   
@@ -472,5 +509,4 @@ modal_age <- function(data_out) {
   
   agem + ((dx0 - dx1) / (dx0 - dx1 + dx0 - dx2))
   
-  }
-
+}

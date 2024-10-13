@@ -1,4 +1,3 @@
-
 #' read_data
 #' @description Read the with supported file extension into the program. The file should contain at minimum 3 columns "Deaths", "Exposures","Age" named this way or positioned in a corresponding order.
 #' @param user_file character. File name with corresponding extension e.g. `data.csv`.
@@ -81,26 +80,34 @@ read_data <- function(user_file, skip = 0) {
 #' @description Checks to make sure that key variables plus age result in one row per unique stratum.
 #' @param data a `data.frame` or `tibble`
 #' @param keys character vector of columns definining strata
-#' @importFrom dplyr cur_group_id mutate group_by_at
+#' @importFrom dplyr cur_group_id mutate group_by_at ungroup
 #' @export
-create_groupid <- function(data, keys){
+create_groupid <- function(data, keys) {
+  
   data |> 
     group_by_at(keys) |> 
-    mutate(.id = cur_group_id(), .before = 1)
+    mutate(.id = cur_group_id(), .before = 1) |>
+    ungroup()
+  
 }
 
 #' @title check_groupid
 #' @description Checks to make sure `.id` column plus `Age` indeed completely define all strata present in the data.
 #' @param data `data.frame`-like object
 #' @return logical TRUE if strata completely defined.
-#' @importFrom dplyr group_by summarize
+#' @importFrom dplyr group_by summarize n
 #' @export
+
 check_groupid <- function(data){
-  stopifnot(".id" %in% colnames(data))
+
+    stopifnot(".id" %in% colnames(data))
+  
   check <-
     data |> 
     group_by(.id, Age) |> 
     summarize(n = n(), .groups = "drop")
+  
   all(check$n == 1)
+  
 }
 

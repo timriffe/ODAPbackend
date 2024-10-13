@@ -10,21 +10,41 @@
 #' @importFrom rlang .data
 #' @export
 #' @examples
-#' \dontrun{
-#' library(readr)
-#' fpath <- system.file("extdata", "abridged_data.csv", package = "ODAPbackend")
-#' data_in <- read_csv(fpath)
-#' plot_compare_rates(
-#'   data_in = data_in,
-#'   data_out = data_out,
-#'   extrapFrom = 60
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures)
+#' 
+#' data_out <- lt_flexible(
+#'   data_in,
+#'   OAnew      = 100,
+#'   age_out    = "single",
+#'   extrapFrom = 80,
+#'   extrapFit  = NULL,
+#'   # Default NULL, computed later
+#'   extrapLaw  = NULL,
+#'   radix      = 1e+05,
+#'   SRB        = 1.05,
+#'   a0rule     = "Andreev-Kingkade",
+#'   axmethod   = "UN (Greville)",
+#'   Sex = "t"
 #' )
-#' }
+#' 
+#' plot_compare_rates(data_in, data_out$data_out$data$data_out, 60)
+#' 
+
 plot_compare_rates <- function(data_in, # raw mx to plot
                                data_out, # the data from lt
                                extrapFrom) {
   # plot the results
-  
   input_single <- is_single(unique(data_in$Age))
   
   data_in_plot <-
@@ -46,7 +66,12 @@ plot_compare_rates <- function(data_in, # raw mx to plot
     data_in_plot <-  data_in_plot |>
       mutate(.id = "all")
     
-    }
+  }
+  
+  if (!(".id" %in% colnames(data_out))){
+    data_out <- data_out |>
+      mutate(.id = "all")
+  }
   
   id <- unique(pull(data_in_plot, .id))
   
@@ -66,7 +91,7 @@ plot_compare_rates <- function(data_in, # raw mx to plot
   figure <-
     ggplot() +
     geom_line(data = data_out_plot, aes(.data$`Age Mid`,y = .data$nMx), linewidth = 0.8) +
-    geom_line(data = data_out_plot, aes(.data$`Age Mid`,y = .data$nMx, text = .data$age_label), linewidth = 0.8) +
+    geom_line(data = data_out_plot, aes(.data$`Age Mid`,y = .data$nMx), linewidth = 0.8) +
     geom_line(
       data = filter(data_in_plot, .data$Age >= min(extrapFrom, max(data_out$Age))),
       aes(
@@ -77,6 +102,7 @@ plot_compare_rates <- function(data_in, # raw mx to plot
       col = "red",
       linewidth = 1
     ) +
+    facet_wrap(~ .id) +
     scale_x_continuous(breaks = pretty_breaks()) +
     scale_y_log10() +
     theme_light() +
@@ -142,22 +168,31 @@ plot_compare_rates <- function(data_in, # raw mx to plot
 #'     axmethod = "un",
 #'     Sex = "m"
 #'   )
-#' plots <- plot_lifetable(data_out = data_out)
-#' print(plots$nMx)
-#' print(plots$lx)
-#' print(plots$ndx)
+#' result <- plot_lifetable(data_out$data_out$data$data_out)
+#' result$nMx$nMx_plot
+#' result$lx$lx_plot
+#' result$ndx$ndx_plot
+#' result$nqx$nqx_plot
 #' }
 # TODO: add plot titles
+
 plot_lifetable <- function(data_out) {
+  
+  if (!(".id" %in% colnames(data_out))){
+    data_out <- data_out |>
+      mutate(.id = "all")
+  }
+  
   lx25 <- ineq_quantile_lower(age = data_out$Age, lx = data_out$lx, quantile = 0.25)
   lx50 <- ineq_quantile_lower(age = data_out$Age, lx = data_out$lx, quantile = 0.5)
   lx75 <- ineq_quantile_lower(age = data_out$Age, lx = data_out$lx, quantile = 0.75)
   e0   <- data_out$ex[data_out$Age == 0]
+  
   dt   <- data_out |>
     mutate(
-      AgeInt = age2int(.data$Age, OAG = FALSE),
-      single = is_single(.data$Age),
-      age_plot = if_else(.data$single, .data$Age, .data$Age + (.data$AgeInt / 2)),
+      AgeInt    = age2int(.data$Age, OAG = FALSE),
+      single    = is_single(.data$Age),
+      age_plot  = if_else(.data$single, .data$Age, .data$Age + (.data$AgeInt / 2)),
       age_label = case_when(
         Age == max(.data$Age) ~ paste0(max(.data$Age), "+"),
         TRUE ~ paste0("Ages between: [", Age, ",", Age + AgeInt, ")")
@@ -169,7 +204,7 @@ plot_lifetable <- function(data_out) {
   nMx_plot <- dt |>
     ggplot(aes(x = .data$age_plot, y = .data$nMx), col = "black") +
     geom_line() + # or geom_step()
-    geom_line(aes(text = age_label)) + # or geom_step()
+    # geom_line(aes(text = age_label)) + # or geom_step()
     scale_y_log10() +
     theme_light() +
     theme(
@@ -191,7 +226,7 @@ plot_lifetable <- function(data_out) {
     mutate(lx = round(.data$lx, 8)) |>
     ggplot(aes(x = .data$age_plot, y = .data$lx), col = "black") +
     geom_line() + # or geom_step()
-    geom_line(aes(text = age_label)) + # or geom_step()
+    # geom_line(aes(text = age_label)) + # or geom_step()
     theme_light() +
     theme(
       axis.text = element_text(color = "black"),
@@ -247,7 +282,7 @@ plot_lifetable <- function(data_out) {
     mutate(dx = round(.data$ndx / .data$AgeInt, 8)) |>
     ggplot(aes(x = .data$Age, y = .data$dx), col = "black") +
     geom_line() + # or geom_step()
-    geom_line(aes(text = age_label)) + # or geom_step()
+    # geom_line(aes(text = age_label)) + # or geom_step()
     theme_light() +
     theme(
       axis.text = element_text(color = "black"),
@@ -300,7 +335,7 @@ plot_lifetable <- function(data_out) {
     mutate(nqx = round(nqx, 2)) |>
     ggplot(aes(x = .data$Age, y = .data$nqx), col = "black") +
     geom_line() +
-    geom_line(aes(text = age_label)) +
+    # geom_line(aes(text = age_label)) +
     scale_y_log10() +
     theme_light() +
     theme(
@@ -325,8 +360,6 @@ plot_lifetable <- function(data_out) {
   
 }
 
-
-
 abs_and_comma <- function(x, ...) {
   format(abs(x), ..., big.mark = ",", scientific = FALSE, trim = TRUE)
 }
@@ -342,26 +375,28 @@ abs_and_comma <- function(x, ...) {
 #' @importFrom rlang sym .data := !!
 #' @export
 #' @examples
-#' \dontrun{
-#' data1 <- data
-#' data1$Sex <- "Female"
-#' data1$Exposures <- data1$Exposures
-#' data1$Deaths <- data1$Deaths
-#' data <- data %>%
-#'   full_join(data1) %>%
-#'   mutate(Deaths = ifelse(Sex == "Female", Deaths + rpois(22, lambda = 50), Deaths))
-#'
-#' pyramid(data = data, y = "Deaths")
-#' }
-pyramid <- function(data, y) {
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures,AgeInt = c(diff(Age), NA))
+#' pyramid(data_in, "Exposures")
 
+pyramid <- function(data, y) {
   
   data |>
     filter(.data$Sex %in% c("Male", "Female")) |>
     mutate(Sex = factor(.data$Sex, levels = c("Male", "Female"))) |> 
     mutate(!!y := ifelse(.data$Sex == "Male", -(!!sym(y)), !!sym(y))) |> # done
     ggplot(aes(x = .data$Age, y = (.data[[y]] / .data$AgeInt), fill = .data$Sex, width = .data$AgeInt)) +
-
+    
     geom_bar(stat = "identity") +
     coord_flip() +
     scale_x_continuous(breaks = pretty_breaks()) +
@@ -384,6 +419,39 @@ pyramid <- function(data, y) {
     )
 }
 
+# plot pyramid in case there are many .id For future
+# Same for other initial plots
+# plot_pyramid <- function(data, y) {
+#   
+#   data %>%
+#     mutate(.id = "f") %>%
+#     group_nest(.id) %>%
+#     mutate(figure = map(data, ~ pyramid(.x, y)))
+#   
+# }
+# 
+# show_input_rates <- function(data) {
+#   
+#   data %>%
+#     mutate(.id = "f") %>%
+#     group_nest(.id) %>%
+#     mutate(figure = map(data, ~ plot_input_rates(.x)))
+#   
+# }
+# 
+# show_histogram <- function(data, y) {
+#   
+#   data %>%
+#     mutate(.id = "f") %>%
+#     group_nest(.id) %>%
+#     mutate(figure = map(data, ~ plot_histogram(.x, y)))
+#   
+# }
+
+# Usage: plot_pyramid(data_in, "Exposures")$figure
+# show_input_rates(data_in)$figure
+# plot_histogram(data_in, "Deaths")
+# show_histogram(data_in, "Deaths")$figure
 
 #' plot_input_rates
 #' @description Plots a line graph of the log10 transformed empirical mortality rate (Mx).
@@ -395,21 +463,31 @@ pyramid <- function(data, y) {
 #' @importFrom rlang .data
 #' @export
 #' @examples
-#' \dontrun{
-#' plot_input_rates(data = mutate(data, sex = "Female"))
-#' }
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures, AgeInt = c(diff(Age), NA))
+#' plot_input_rates(data_in)
 #'
 
 plot_input_rates <- function(data) {
-
+  
   data <- data |>
     mutate(nMx = round(.data$Deaths / .data$Exposures,8),
            AgeInt = age2int(.data$Age, OAG = FALSE),
            single = is_single(.data$Age),
            age_plot = if_else(.data$single, .data$Age, .data$Age + (.data$AgeInt / 2)),
            age_label = case_when(Age == max(.data$Age) ~ paste0(max(.data$Age),"+"),
-                               TRUE ~ paste0("[", .data$Age, ",", .data$Age + .data$AgeInt, ")")))
-
+                                 TRUE ~ paste0("[", .data$Age, ",", .data$Age + .data$AgeInt, ")")))
+  
   if(any(colnames(data) == "Sex")){
     
     p <- data |>
@@ -436,17 +514,16 @@ plot_input_rates <- function(data) {
       axis.text = element_text(size = 10, color = "black"),
       plot.subtitle = element_text(size = 12, color = "black")
     )
-
-
+  
+  
   return(
     lst(
       figure,
       data = data |> select(.data$Age, .data$age_label, .data$nMx)
     )
   )
-
+  
 }
-
 
 #' plot_histogram
 #' @description Plots a histogram of population or death, depending on the user choice.
@@ -458,9 +535,21 @@ plot_input_rates <- function(data) {
 #' @importFrom rlang .data !! sym
 #' @export
 #' @examples
-#' \dontrun{
-#' plot_histogram(data = mutate(data, Sex = "Female"), y = "Deaths")
-#' }
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures, AgeInt = c(diff(Age), NA))
+#' plot_histogram(data_in, "Deaths)
+#' 
+
 plot_histogram <- function(data, y) {
   
   if (! "AgeInt" %in% colnames(data)){
@@ -475,7 +564,7 @@ plot_histogram <- function(data, y) {
            age_label = case_when(Age == max(Age) ~ paste0(max(Age), "+"),
                                  TRUE ~ paste0("[", Age, ",", Age + AgeInt, ")"))) |> 
     select(Age, AgeInt, age_label, !!y_sym, y_plot) 
-    
+  
   
   figure <- data |> 
     ggplot(aes(x = Age + AgeInt / 2, y = y_plot, width = AgeInt), color = "black") +
@@ -499,7 +588,7 @@ plot_histogram <- function(data, y) {
       y = y,
       x = "Age"
     )
-
+  
   return(
     lst(
       figure,
@@ -566,14 +655,23 @@ plot_histogram <- function(data, y) {
 #' @importFrom rlang .data !! sym
 #' @export
 #' @examples
-#' \dontrun{
-#' plot_initial_single_sex(
-#'   data = mutate(data,
-#'     sex = "Female"
-#'   )
-#' )
-#' }
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures, AgeInt = c(diff(Age), NA))
+#' plot_initial_single_sex(data_in)
+#' 
+
 plot_initial_single_sex <- function(data) {
+  
   data <- 
     data |> 
     mutate(Mx_emp    = Deaths / Exposures,
@@ -584,66 +682,64 @@ plot_initial_single_sex <- function(data) {
                                  TRUE ~ paste0("[", Age, ",", Age + AgeInt, ")"))) |> 
     select(-"single")
   
-    # ------------------ #
-    # exposures bar plot #
-    # ------------------ #
-    Exposures <- plot_histogram(data = data, y = "Exposures")
-
-    dt           <- data
-    dt$Exposures <- round(dt$Exposures / dt$AgeInt, 8)
-    dt$age_label <- paste0("Ages between: ", dt$age_label)
-
-    Exposures$figure <-
-      Exposures$figure +
-      geom_col(
-        data = dt,
-        aes(
-          y = Exposures,
-          text = age_label
-        )
-      )
-    # ------------------ #
-    #    deaths bar plot #
-    # ------------------ #
-    Deaths <- plot_histogram(data = data, y = "Deaths")
-
-    dt           <- data
-    dt$Deaths    <- round(dt$Deaths / dt$AgeInt, 8)
-    dt$age_label <- paste0("Ages between: ", dt$age_label)
-
-    Deaths$figure <-
-      Deaths$figure +
-      geom_col(
-        data = dt,
-        aes(
-          y = Deaths,
-          text = age_label
-        )
-      )
+  # ------------------ #
+  # exposures bar plot #
+  # ------------------ #
+  Exposures    <- plot_histogram(data = data, y = "Exposures")
+  dt           <- data
+  dt$Exposures <- round(dt$Exposures / dt$AgeInt, 8)
+  dt$age_label <- paste0("Ages between: ", dt$age_label)
   
-    # ------------------ #
-    # rates plot         #
-    # ------------------ #
-    `Empirical Mx` <- plot_input_rates(data = data)
-
-    dt           <- data
-    dt$age_plot <- dt$`Age Mid`
-    dt$age_label <- paste0("Ages beween: ", dt$age_label)
-    dt$nMx       <- round(dt$Deaths / dt$Exposures, 8)
-
-    `Empirical Mx`$figure <-
-      `Empirical Mx`$figure +
-      geom_line(
-        data = dt,
-        aes(
-          text = age_label
-        )
+  Exposures$figure <-
+    Exposures$figure +
+    geom_col(
+      data = dt,
+      aes(
+        y = Exposures,
+        text = age_label
       )
+    )
+  # ------------------ #
+  #    deaths bar plot #
+  # ------------------ #
+  Deaths <- plot_histogram(data = data, y = "Deaths")
   
-
+  dt           <- data
+  dt$Deaths    <- round(dt$Deaths / dt$AgeInt, 8)
+  dt$age_label <- paste0("Ages between: ", dt$age_label)
+  
+  Deaths$figure <-
+    Deaths$figure +
+    geom_col(
+      data = dt,
+      aes(
+        y = Deaths,
+        text = age_label
+      )
+    )
+  
+  # ------------------ #
+  # rates plot         #
+  # ------------------ #
+  `Empirical Mx` <- plot_input_rates(data = data)
+  
+  dt           <- data
+  dt$age_plot <- dt$`Age Mid`
+  dt$age_label <- paste0("Ages beween: ", dt$age_label)
+  dt$nMx       <- round(dt$Deaths / dt$Exposures, 8)
+  
+  `Empirical Mx`$figure <-
+    `Empirical Mx`$figure +
+    geom_line(
+      data = dt,
+      aes(
+        text = age_label
+      )
+    )
+  
+  
   return(lst(Exposures, Deaths, `Empirical Mx`))
 }
-
 
 #' plot_initial_data
 #' @description Plots the corresponding 3 graphics for single sex or for both sex depending on data provided by the user.
@@ -654,10 +750,25 @@ plot_initial_single_sex <- function(data) {
 #' @importFrom rlang .data !! sym
 #' @export
 #' @examples
-#' \dontrun{
-#' plot_initial_data(mutate(data, sex = "Female")
-#' )
-#' }
+#' Exposures <- c(100958, 466275, 624134, 559559, 446736, 370653, 301862,
+#'                249409, 247473, 223014, 172260, 149338, 127242, 105715,
+#'                79614,  53660,  31021,  16805,  8000,   4000,   2000,
+#'                1000)
+#' 
+#' Deaths <- c(8674, 1592, 618,  411,  755,  1098, 1100, 1357,
+#'             1335, 3257, 2200, 4023, 2167, 4578, 2956, 4212,
+#'             2887, 2351, 1500, 900,  500,  300)
+#' 
+#' sex     <- c("f")
+#' Age     <- c(0, 1, seq(5, 100, by = 5))
+#' data_in <- data.frame(Age, Deaths, Exposures, AgeInt = c(diff(Age), NA))
+#' result <-plot_initial_data(data_in)
+#' 
+#' result$Exposures$figure
+#' result$Deaths$figure
+#' result$`Empirical Mx`$figure
+#' 
+
 plot_initial_data <- function(data) {
   
   if("Sex" %in% colnames(data)) {
@@ -669,21 +780,21 @@ plot_initial_data <- function(data) {
     sexes <- 1
     
   }
-
+  
   if (length(sexes) > 1) {
-
+    
     
     data <- data |>
       filter(.data$Sex %in% c("Male", "Female"))
-
+    
     warning("Currently plots only handle single-sex data")
     
- 
+    
   } else {
-
+    
     result <- plot_initial_single_sex(data)
     
   }
-
+  
   return(result)
 }
