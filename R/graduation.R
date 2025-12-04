@@ -541,6 +541,20 @@ graduate_auto <- function(data_in,
       Type = graduated_text
     )
 
+    # Check if we're converting from single ages to grouped ages
+    # If so, normalize graduated values for fair visual comparison
+    input_is_single <- DemoTools::is_single(data_in$Age)
+    output_is_grouped <- !DemoTools::is_single(data_out$Age) &&
+                        (age_out %in% c("5-year", "abridged"))
+
+    if (input_is_single && output_is_grouped) {
+      # For visual comparison, divide grouped values by typical interval width
+      # This shows average per single age rather than sum
+      age_intervals <- diff(c(data_out$Age, max(data_out$Age) + 5))
+      graduated_df$Value <- graduated_df$Value / age_intervals
+      cat(sprintf("[GRADUATION] Normalized graduated values for plot (single->grouped conversion)\n"))
+    }
+
     # Rename columns to translated versions for hover tooltips
     names(original_df)[names(original_df) == "Age"] <- age_text
     names(original_df)[names(original_df) == "Value"] <- variable_text
@@ -577,7 +591,28 @@ graduate_auto <- function(data_in,
     cat(sprintf("[GRADUATION] Plot creation error: %s\n", e$message))
   })
 
-  return(list(data_out = data_out,
+  # Normalize data_out for download to ensure matching totals
+  # This is different from plot normalization - here we preserve total sums
+  data_out_normalized <- data_out
+
+  # Check if we're converting from single ages to grouped ages
+  input_is_single <- DemoTools::is_single(data_in$Age)
+  output_is_grouped <- !DemoTools::is_single(data_out$Age) &&
+                      (age_out %in% c("5-year", "abridged"))
+
+  if (input_is_single && output_is_grouped) {
+    # Calculate scaling factor to preserve total sum
+    total_original <- sum(data_in[[variable]], na.rm = TRUE)
+    total_graduated <- sum(data_out[[variable]], na.rm = TRUE)
+
+    if (total_graduated > 0) {
+      scaling_factor <- total_original / total_graduated
+      data_out_normalized[[variable]] <- data_out[[variable]] * scaling_factor
+      cat(sprintf("[GRADUATION] Applied normalization factor %.4f to preserve totals in downloaded data\n", scaling_factor))
+    }
+  }
+
+  return(list(data_out = data_out_normalized,
               plot = plot_obj
               # arguments = f_args
               ))
@@ -962,10 +997,17 @@ smooth_flexible_chunk <- function(data_in,
   }
   
   if(any(data5[, variable, drop = TRUE] < 0)) {
-    stop(
-      "Check your input data or consider changing the selected rough method. 
-      Current smoothing process is returning negative values."
-    )
+    neg_idx <- which(data5[, variable, drop = TRUE] < 0)
+    neg_ages <- paste(data5$Age[neg_idx], collapse = ", ")
+    neg_vals <- paste(round(data5[neg_idx, variable, drop = TRUE], 2), collapse = ", ")
+
+    stop(paste0(
+      "Smoothing produced negative values for '", variable, "'\n",
+      "Method '", rough_method, "' produced negative values at ages: ", neg_ages, "\n",
+      "Values: ", neg_vals, "\n",
+      "This typically happens when data has extreme discontinuities (e.g., large jumps between age groups)\n",
+      "Try using 'auto' method instead, or check your input data for irregularities"
+    ))
   }
   
   # HERE

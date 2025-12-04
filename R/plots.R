@@ -474,9 +474,10 @@ abs_and_comma <- function(x, ...) {
 pyramid <- function(data, y) {
   
   data |>
-    filter(.data$Sex %in% c("Male", "Female")) |>
-    mutate(Sex = factor(.data$Sex, levels = c("Male", "Female"))) |> 
-    mutate(!!y := ifelse(.data$Sex == "Male", -(!!sym(y)), !!sym(y))) |> # done
+    mutate(Sex = tolower(.data$Sex)) |>
+    filter(.data$Sex %in% c("male", "female")) |>
+    mutate(Sex = factor(.data$Sex, levels = c("male", "female"))) |>
+    mutate(!!y := ifelse(.data$Sex == "male", -(!!sym(y)), !!sym(y))) |> # done
     ggplot(aes(x = .data$Age, y = (.data[[y]] / .data$AgeInt), fill = .data$Sex, width = .data$AgeInt)) +
     
     geom_bar(stat = "identity") +
@@ -926,7 +927,8 @@ plot_initial_data <- function(data, i18n = NULL) {
   if (length(sexes) > 1) {
     
     data <- data |>
-      filter(.data$Sex %in% c("Male", "Female"))
+      mutate(Sex = tolower(.data$Sex)) |>
+      filter(.data$Sex %in% c("male", "female"))
     
     warning("Currently plots only handle single-sex data")
     

@@ -90,8 +90,8 @@ odap_opag <- function(data_in           = NULL,
   
   # chosen method
   method <- match.arg(method, c("mono", "pclm", "uniform"))
-  
-  
+
+
   # Helper: conditional filtering for user defined variables
   # e.g. if sex  exits and provided by user we use it in filtering
   conditional_filter <- function(df, col, values) {
