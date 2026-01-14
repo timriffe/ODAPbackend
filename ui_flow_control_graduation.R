@@ -24,11 +24,11 @@ output <- smooth_flexible(data_in,
                 i18n = NULL # ui arg
                 )
 
-# plots currently br
+
 output$data_out # valid output
 
-output$figures # broken due to duplicated Age column, breaks ggplot code
-
+# figure separate for each .id
+print(output$figures[[1]]$figure)
 args(smooth_flexible)
 
 # user-specified arguments:

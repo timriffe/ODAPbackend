@@ -10,7 +10,8 @@ graduate_auto(
   variable = NULL,
   u5m = NULL,
   Sex = c("t", "f", "m"),
-  constrain_infants = TRUE
+  constrain_infants = TRUE,
+  i18n = NULL
 )
 }
 \arguments{
@@ -25,9 +26,11 @@ graduate_auto(
 \item{Sex}{character. Either \code{m} for males, \code{f} for females, or \code{t} for total (default). Please note that in case this parameter is not explicitly provided, the function will scan the data for the column with the corresponding name and use its levels automatically.}
 
 \item{constrain_infants}{logical. A scalar that indicates whether the infant proportions should be constrained or left as is. Defaults to \code{TRUE}.}
+
+\item{i18n}{Optional internationalization object for translating plot labels and titles. Defaults to NULL.}
 }
 \value{
-data_out. A list with two elements: \code{data_out} - a tibble with two numeric columns - smoothed counts for the chosen variable and \code{Age} - chosen age grouping, and \code{arguments} - a list of arguments used in the function.
+data_out. A list with three elements: \code{data_out} - a tibble with two numeric columns - smoothed counts for the chosen variable and \code{Age} - chosen age grouping, \code{plot} - a ggplot2 object comparing original vs graduated data, and \code{arguments} - a list of arguments used in the function.
 }
 \description{
 Smoothed population or death counts with moving averages. The method was adopted from paragraph five of the "Method protocol for evaluating census population data by age and sex".

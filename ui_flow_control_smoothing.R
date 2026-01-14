@@ -1,4 +1,4 @@
-
+# This script in progress, pending some directions
 
 devtools::load_all()
 library(dplyr)

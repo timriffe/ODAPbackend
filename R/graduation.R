@@ -141,11 +141,13 @@ smooth_flexible <- function(data_in,
 #' @param constrain_infants logical. A scalar that indicates whether the infant proportions should be constrained or left as is. Defaults to `TRUE`.
 #' @param u5m numeric. Under-five mortality rate. Defaults to NULL.
 #' @param Sex character. Either `m` for males, `f` for females, or `t` for total (default). Please note that in case this parameter is not explicitly provided, the function will scan the data for the column with the corresponding name and use its levels automatically.
+#' @param i18n Optional internationalization object for translating plot labels and titles. Defaults to NULL.
 #' @importFrom dplyr mutate group_by filter pull select summarise
 #' @importFrom tibble tibble
 #' @importFrom rlang := !! .data
 #' @importFrom DemoTools is_single is_abridged check_heaping_bachi groupAges ageRatioScore mav graduate_mono calcAgeAbr age2int graduate_uniform names2age lt_rule_4m0_D0 lt_rule_4m0_m0
-#' @return data_out. A list with two elements: `data_out` - a tibble with two numeric columns - smoothed counts for the chosen variable and `Age` - chosen age grouping, and `arguments` - a list of arguments used in the function.
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual scale_linetype_manual labs theme_minimal theme element_text
+#' @return data_out. A list with three elements: `data_out` - a tibble with two numeric columns - smoothed counts for the chosen variable and `Age` - chosen age grouping, `plot` - a ggplot2 object comparing original vs graduated data, and `arguments` - a list of arguments used in the function.
 #' @export
 #' @examples
 #' library(readr)
@@ -174,7 +176,8 @@ graduate_auto <- function(data_in,
                           variable = NULL,
                           u5m      = NULL,
                           Sex      = c("t", "f", "m"),
-                          constrain_infants = TRUE) {
+                          constrain_infants = TRUE,
+                          i18n     = NULL) {
   
   ## f_args  <- capture_args()
   age_out <- match.arg(age_out, c("single", "abridged", "5-year"))
@@ -501,18 +504,117 @@ graduate_auto <- function(data_in,
   
   # (3) possibly constrain infants
   if(age_out %in% c("abridged", "single") & age_in %in% c("abridged", "single") & constrain_infants) {
-    
+
     v_child      <- data_out[data_out$Age < 5, variable, drop = TRUE]
     vN           <- sum(v_child)
     v_child[1]   <- pct_fst_ages[1] * vN
     v_child[-1]  <- (1 - pct_fst_ages[1]) * vN * v_child[-1] / sum(v_child[-1])
     data_out[data_out$Age < 5, variable] <- v_child
-    
-  }
-  
-  return(list(data_out = data_out
-              # arguments = f_args
 
+  }
+
+  # Pre-translate all UI text for plots (to avoid scope issues in nested functions)
+  cat(sprintf("[GRADUATION] Pre-translating text | i18n_null=%s\n", is.null(i18n)))
+  graduation_text <- translate_text("Graduation", i18n)
+  age_text <- translate_text("Age", i18n)
+  original_text <- translate_text("Original", i18n)
+  graduated_text <- translate_text("Graduated", i18n)
+  type_text <- translate_text("Type", i18n)
+  variable_text <- translate_text(variable, i18n)
+
+  cat(sprintf("[GRADUATION] Translations: graduation='%s', age='%s', original='%s', graduated='%s'\n",
+              graduation_text, age_text, original_text, graduated_text))
+
+  # Create plot comparing original vs graduated data
+  plot_obj <- NULL
+  tryCatch({
+    # Combine original and graduated data
+    original_df <- data.frame(
+      Age = data_in$Age,
+      Value = data_in[[variable]],
+      Type = original_text
+    )
+
+    graduated_df <- data.frame(
+      Age = data_out$Age,
+      Value = data_out[[variable]],
+      Type = graduated_text
+    )
+
+    # Check if we're converting from single ages to grouped ages
+    # If so, normalize graduated values for fair visual comparison
+    input_is_single <- DemoTools::is_single(data_in$Age)
+    output_is_grouped <- !DemoTools::is_single(data_out$Age) &&
+                        (age_out %in% c("5-year", "abridged"))
+
+    if (input_is_single && output_is_grouped) {
+      # For visual comparison, divide grouped values by typical interval width
+      # This shows average per single age rather than sum
+      age_intervals <- diff(c(data_out$Age, max(data_out$Age) + 5))
+      graduated_df$Value <- graduated_df$Value / age_intervals
+      cat(sprintf("[GRADUATION] Normalized graduated values for plot (single->grouped conversion)\n"))
+    }
+
+    # Rename columns to translated versions for hover tooltips
+    names(original_df)[names(original_df) == "Age"] <- age_text
+    names(original_df)[names(original_df) == "Value"] <- variable_text
+    names(original_df)[names(original_df) == "Type"] <- type_text
+
+    names(graduated_df)[names(graduated_df) == "Age"] <- age_text
+    names(graduated_df)[names(graduated_df) == "Value"] <- variable_text
+    names(graduated_df)[names(graduated_df) == "Type"] <- type_text
+
+    plot_data <- rbind(original_df, graduated_df)
+
+    # Create named vector for colors using translated keys
+    color_values <- c("black", "blue")
+    names(color_values) <- c(original_text, graduated_text)
+
+    # Build plot using .data[[]] for runtime evaluation
+    plot_obj <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[age_text]], y = .data[[variable_text]],
+                                       color = .data[[type_text]],
+                                       linetype = .data[[type_text]])) +
+      ggplot2::geom_line(linewidth = 1) +
+      ggplot2::geom_point(data = plot_data[plot_data[[type_text]] == original_text, ], size = 2) +
+      ggplot2::scale_color_manual(name = type_text, values = color_values) +
+      ggplot2::scale_linetype_manual(name = type_text, values = c("solid", "solid")) +
+      ggplot2::labs(x = age_text, y = variable_text,
+           title = paste0(graduation_text, ": ", variable_text)) +
+      ggplot2::theme_minimal(base_size = 14) +
+      ggplot2::theme(
+        legend.position = "bottom",
+        plot.title = ggplot2::element_text(face = "bold", hjust = 0.5)
+      )
+
+    cat(sprintf("[GRADUATION] Plot created successfully\n"))
+  }, error = function(e) {
+    cat(sprintf("[GRADUATION] Plot creation error: %s\n", e$message))
+  })
+
+  # Normalize data_out for download to ensure matching totals
+  # This is different from plot normalization - here we preserve total sums
+  data_out_normalized <- data_out
+
+  # Check if we're converting from single ages to grouped ages
+  input_is_single <- DemoTools::is_single(data_in$Age)
+  output_is_grouped <- !DemoTools::is_single(data_out$Age) &&
+                      (age_out %in% c("5-year", "abridged"))
+
+  if (input_is_single && output_is_grouped) {
+    # Calculate scaling factor to preserve total sum
+    total_original <- sum(data_in[[variable]], na.rm = TRUE)
+    total_graduated <- sum(data_out[[variable]], na.rm = TRUE)
+
+    if (total_graduated > 0) {
+      scaling_factor <- total_original / total_graduated
+      data_out_normalized[[variable]] <- data_out[[variable]] * scaling_factor
+      cat(sprintf("[GRADUATION] Applied normalization factor %.4f to preserve totals in downloaded data\n", scaling_factor))
+    }
+  }
+
+  return(list(data_out = data_out_normalized,
+              plot = plot_obj
+              # arguments = f_args
               ))
 }
 
@@ -895,10 +997,17 @@ smooth_flexible_chunk <- function(data_in,
   }
   
   if(any(data5[, variable, drop = TRUE] < 0)) {
-    stop(
-      "Check your input data or consider changing the selected rough method. 
-      Current smoothing process is returning negative values."
-    )
+    neg_idx <- which(data5[, variable, drop = TRUE] < 0)
+    neg_ages <- paste(data5$Age[neg_idx], collapse = ", ")
+    neg_vals <- paste(round(data5[neg_idx, variable, drop = TRUE], 2), collapse = ", ")
+
+    stop(paste0(
+      "Smoothing produced negative values for '", variable, "'\n",
+      "Method '", rough_method, "' produced negative values at ages: ", neg_ages, "\n",
+      "Values: ", neg_vals, "\n",
+      "This typically happens when data has extreme discontinuities (e.g., large jumps between age groups)\n",
+      "Try using 'auto' method instead, or check your input data for irregularities"
+    ))
   }
   
   # HERE
@@ -1272,13 +1381,8 @@ plot_smooth_compare <- function(data_in,
   # Translate the variable name for display if translation exists
   variable_display <- translate_text(variable, i18n)
   age_text <- translate_text("Age", i18n)
-  # TR: kludge 2025-10-14 in order to avoid having two columns called Age
-  # in data_out when the language is English, which breaks ggplot code.
-  age_text <- paste0(" ",age_text," ")
-  # same
-  variable_display <- paste0(" ",variable_display," ")
   title_text <- paste(translate_text("Original (black) and adjusted (red)", i18n), variable_display, translate_text("data", i18n))
-  
+
   data_in <- data_in |> 
     mutate(
       single = is_single(.data$Age),
@@ -1296,16 +1400,8 @@ plot_smooth_compare <- function(data_in,
       age_label = case_when(.data$Age == max(.data$Age) ~ paste0(max(.data$Age), "+"),
                             TRUE ~ paste0("[", .data$Age, ",", .data$Age + .data$AgeInt, ")")),
       plot_y = !!sym(variable) / .data$AgeInt)
-  
-  # Translate column names for display
-  names(data_in)[names(data_in) == "age_mid"] <- age_text
-  names(data_out)[names(data_out) == "age_mid"] <- age_text
-
-  names(data_in)[names(data_in) == "plot_y"] <- variable_display
-  names(data_out)[names(data_out) == "plot_y"] <- variable_display
-
-  sym_variable_display <- sym(variable_display)
-  sym_age_text <- sym(age_text)
+  sym_variable_display <- sym("plot_y")
+  sym_age_text <- sym("age_mid")
 
   figure <- 
   ggplot() +
@@ -1326,7 +1422,6 @@ plot_smooth_compare <- function(data_in,
              data_adjusted = data_out,
              data_original = data_in))
 }
-
 
 
 

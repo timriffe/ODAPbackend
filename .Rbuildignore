@@ -1,10 +1,9 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-new_flow_control.R
 test.R
 build.R
 .gitignore
-  ui_flow_control.R
+ui_flow_control*.R
 heaping_breakpoints.R
 R/test2.R
 R/test_data_NOT_part_of_final_package.R

@@ -642,31 +642,35 @@ lt_summary_chunk <- function(data_out, i18n = NULL) {
   p_20_65    <- l65 / l20
   q_20_65    <- 1 - p_20_65
   
-  out <- tibble(e0, 
+  label_vec <- c("e_0",
+                 translate_text("Median", i18n),
+                 translate_text("Mode", i18n),
+                 "e_65",
+                 "\\sigma_0",
+                 "\\sigma_{10}",
+                 "IQR",
+                 "{}_{45}q_{20}")
+
+  message_vec <- c(translate_text("Life Expectancy at Birth", i18n),
+                   translate_text("Median Age at Death", i18n),
+                   translate_text("Modal Age at Death", i18n),
+                   translate_text("Remaining Life Expectancy at Age 65", i18n),
+                   translate_text("Lifespan Variation Calculated as Standard Deviation of Age at Death", i18n),
+                   translate_text("Standard Deviation of Remaining Lifespan Conditional on Survival to Age 10", i18n),
+                   translate_text("Interquartile Range of Age at Death Distribution", i18n),
+                   translate_text("Conditional Probability of Death Between Ages 20 and 65", i18n))
+
+  out <- tibble(e0,
                 Median = median_age,
                 Mode   = mod_age,
-                e65, 
-                sd0  = S[1], 
+                e65,
+                sd0  = S[1],
                 sd10 = S[11],
                 IQR,
-                q_20_65) |> 
-    pivot_longer(everything(), names_to = "measure", values_to = "value") |> 
-    mutate(label = c("e_0",
-                     translate_text("Median", i18n),
-                     translate_text("Mode", i18n),
-                     "e_65",
-                     "\\sigma_0",
-                     "\\sigma_{10}",
-                     "IQR",
-                     "{}_{45}q_{20}"),
-           message = c(translate_text("Life Expectancy at Birth", i18n),
-                       translate_text("Median Age at Death", i18n),
-                       translate_text("Modal Age at Death", i18n),
-                       translate_text("Remaining Life Expectancy at Age 65", i18n),
-                       translate_text("Lifespan Variation Calculated as Standard Deviation of Age at Death", i18n),
-                       translate_text("Standard Deviation of Remaining Lifespan Conditional on Survival to Age 10", i18n),
-                       translate_text("Interquartile Range of Age at Death Distribution", i18n),
-                       translate_text("Conditional Probability of Death Between Ages 20 and 65", i18n)))
+                q_20_65) |>
+    pivot_longer(everything(), names_to = "measure", values_to = "value") |>
+    mutate(label = label_vec,
+           message = message_vec)
   
   # Note from Jorge C: pleassseee let's leave the order as is. If we change this order
   # then I have to change the order (not adding any other columns or anything) in the
