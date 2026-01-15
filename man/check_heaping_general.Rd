@@ -12,7 +12,7 @@ check_heaping_general(data, y)
 \item{y}{character.Variable name for which the heaping should be checked \code{Deaths} or \code{Exposures}.}
 }
 \value{
-A data.frame with 2 columns \code{method} - the method used for age heaping evaluation and \code{result} - the resulting heaping measure
+A data.frame with 3 columns \code{method} - the method used for age heaping evaluation, \code{result} - the resulting heaping measure, and \code{.id} - user specified groups identifier (if missing is set to "all")
 }
 \description{
 Check the age heaping for 5 or 1 year data.
