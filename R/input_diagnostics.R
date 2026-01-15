@@ -2,11 +2,15 @@
 #' @description Check the age heaping for 5 or 1 year data.
 #' @param data data.frame. User file from the read_data command with the minimum data on `Exposures`, `Death` and `Age`. Data can be both in 5 and 1 year age intervals
 #' @param y character.Variable name for which the heaping should be checked `Deaths` or `Exposures`.
-#' @return A data.frame with 2 columns `method` - the method used for age heaping evaluation and `result` - the resulting heaping measure
+#' @return A data.frame with 3 columns `method` - the method used for age heaping evaluation, `result` - the resulting heaping measure, and `.id` - user specified groups identifier (if missing is set to "all") 
+#' @importFrom tibble tibble
+#' @importFrom tidyr unnest pivot_longer
+#' @importFrom tidyselect all_of
 #' @importFrom stringr str_detect 
-#' @importFrom dplyr bind_rows left_join join_by
+#' @importFrom dplyr bind_rows left_join select group_nest mutate pull group_by
 #' @importFrom rlang .data 
-#' @importFrom DemoTools check_heaping_roughness check_heaping_bachi check_heaping_myers check_heaping_sawtooth
+#' @importFrom purrr map map2
+#' @importFrom DemoTools is_single check_heaping_roughness check_heaping_bachi check_heaping_myers check_heaping_sawtooth
 #' @export
 #' @examples
 #' \dontrun{
@@ -154,8 +158,8 @@ check_heaping_general <- function(data, y) {
                            Value  = pull(.x, !!sym(y)),
                            Age    = .x$Age,
                            ageMin = 30)),
-      "res" = map2(.x = roughness, 
-                   .y = sawtooth, ~ 
+      "res" = map2(.x = .data$roughness, 
+                   .y = .data$sawtooth, ~ 
                      bind_rows(
                        classify(
                          x      = .x,
