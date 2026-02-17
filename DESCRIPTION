@@ -23,6 +23,10 @@ Suggests:
 Imports:
     DemoTools (>= 01.13.85),
     stringr,
+    codetools,
+    wpp2024,
+    forcats,
+    ungroup,
     dplyr,
     scales,
     readxl,

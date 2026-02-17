@@ -131,8 +131,6 @@ check_numeric <- function(data) {
 #'     data = data)
 #'
 
-# Should we even ask some of these? Like if there is no AgeInt the reader will not work.
-
 check_missing_cols <- function(data) {
   # TR: DemoTools has the function age2int() to infer age intervals from an Age vector,
   # to technically we don't need it. We do however need ages specified as lower bounds of
@@ -884,3 +882,334 @@ check_data_opag <- function(data) {
 
   return(result)
 }
+
+
+#' Checks input data for lifetable reconstruction
+#' @title Check consistency of lifetable input data
+#' @description
+#' Validates a data frame intended for lifetable reconstruction.
+#' The function checks whether the input contains at least one column that can be used to reconstruct a full lifetable and performs a set of structural and value-based validations.
+#' If no grouping variable `.id` is present, one is automatically created with a single level `"all"`.
+#' @details
+#' The function searches for at least one of the following columns (in order of preference):
+#' \itemize{
+#'   \item \code{nMx}
+#'   \item \code{nlx}
+#'   \item \code{nqx}
+#'   \item \code{npx}
+#'   \item \code{ndx}
+#'   \item \code{nLx}
+#' }
+#' The first available column is used for validation checks. The following checks are performed:
+#' \itemize{
+#'   \item Numeric type validation
+#'   \item Missing value detection
+#'   \item Non-negativity constraint
+#' }
+#' If an \code{Age} column is present, additional checks are performed:
+#' \itemize{
+#'   \item Age coherence (numeric validity)
+#'   \item Redundancy detection
+#'   \item Sequential ordering
+#' }
+#' Validation is performed separately for each \code{.id} group.
+#' @param data A data frame containing lifetable-related columns. Must include at least one of: \code{nMx}, \code{nlx}, \code{nqx}, \code{npx}, \code{ndx}, or \code{nLx}. Optionally may contain an \code{Age} column and a grouping column \code{.id}.
+#' @importFrom DemoTools age2int is_age_coherent is_age_redundant is_age_sequential
+#' @return
+#' A data frame summarizing validation results for each group. The returned object contains:
+#' \describe{
+#'   \item{check}{Name of the validation performed}
+#'   \item{message}{Error message if the check fails, otherwise \code{NA}}
+#'   \item{pass}{Either `"Pass"` or `"Fail"`}
+#'   \item{.id}{Group identifier}
+#' }
+#'
+#' @examples
+#' library(readr)
+#' fpath       <- system.file("extdata", "single_hmd_spain.csv.gz", package = "ODAPbackend")
+#' data_in     <- read_csv(fpath, col_select = c(-1), show_col_types = FALSE)
+#' data_in$nMx <- data_in$Deaths / data_in$Exposures
+#' data_in     <- data_in[data_in$`.id` == 1, ]
+#' check_data_lifetable(data_in)
+#'
+#' @seealso
+#' \code{\link{age2int}},
+#' \code{\link{is_age_coherent}},
+#' \code{\link{is_age_redundant}},
+#' \code{\link{is_age_sequential}}
+#'
+#' @export
+#' 
+
+check_data_lifetable <- function(data) {
+  
+  # Ensure '.id' column exists
+  if (!(".id" %in% names(data))) {
+    data$.id <- "all"
+  } 
+  
+  # We can reconstruct lifetable from any of these columns
+  # We do not need ax strictly speaking, we cannot reconstruct from Tx and ex
+  # NOTE: I arranged columns in a order of preference from the best to the worst
+  # i.e. I prefer to construct LT from nMx, then from nlx etc.
+  # now I can choose the one column to check very easily
+  lt_cols <- c("nMx", "nlx", "nqx", "npx", "ndx", "nLx")
+  present <- intersect(lt_cols, names(data))[1]
+  # If at lease one column is present we can build a litable
+  # lets perform a series fo checks  
+  if(is.na(present)) {
+    
+    stop(
+      "Your data does not contain columns that can be used to reconstruct a full lifetable.\n",
+      "It must contain at least one of the following: ",
+      paste(lt_cols, collapse = ", "),
+      call. = FALSE
+    )
+    
+  }
+  
+  split_data <- split(data, data$.id)
+  
+  check_one <- function(d) {
+    
+    # choose column to work with   
+    x <- d[[present]]
+    
+    # Perform checks
+    checks <- c(
+      check_numeric  = !is.numeric(x),
+      check_missing  = any(is.na(x)),
+      check_negative = any(x < 0, na.rm = TRUE)
+    )
+    
+    messages <- c(
+      check_numeric  = sprintf("Column %s must be numeric", present),
+      check_missing  = sprintf("Column %s should not contain missing values", present),
+      check_negative = sprintf("All values in column %s should be >= 0", present)
+    )
+    
+    out <- data.frame(
+      check   = paste0(names(checks)," (", present, ")"),
+      message = ifelse(checks, messages, NA_character_))
+    
+    out$pass <- ifelse(!is.na(out$message), "Fail", "Pass")
+    
+    if("Age" %in% names(d)) { 
+      
+      Age    <- d$Age
+      AgeInt <- age2int(Age)
+      
+      checks_age <- c(
+        check_coherent   = !is_age_coherent(Age,  AgeInt),
+        check_redundant  = is_age_redundant(Age, AgeInt),
+        check_sequential = !is_age_sequential(Age)
+      )
+      
+      messages_age <- c(
+        check_coherent   = "Age values must be numeric",
+        check_redundant  = "Age values are redundant",
+        check_sequential = "Age values should be sequential"
+      )
+      
+      out_age <- data.frame(
+        check   = names(checks_age),
+        message = ifelse(checks_age, messages_age, NA_character_))
+      
+      out_age$pass <- ifelse(!is.na(out$message), "Fail", "Pass")
+      
+      out <- rbind(out, out_age)
+      
+    }
+    
+    return(out)
+    
+  }
+  
+  res <-
+    do.call(rbind, lapply(names(split_data), \(id) {
+      cbind(check_one(split_data[[id]]), .id = id)
+    }))
+  
+  return(res)
+  
+}
+
+
+#' Validate input data for age heaping analysis
+#' @title Check consistency of data for age heaping diagnostics
+#' @description
+#' Validates a data frame prior to performing age heaping analysis.
+#' The function checks whether a specified variable contains valid numeric values and ensures that required structural conditions are satisfied.
+#' If a grouping variable \code{.id} is not present, one is automatically created with a single level `"all"`.
+#' Validation is performed separately for each \code{.id} group.
+#' @param data A data frame containing the variable to be evaluated.
+#' Optionally may contain a grouping column \code{.id}.
+#' @param X A character string specifying the name of the variable to be checked (e.g., `"Deaths"`).
+#' @details
+#' For the selected variable \code{X}, the following checks are performed:
+#' \itemize{
+#'   \item Numeric type validation
+#'   \item Missing value detection
+#'   \item Infinite value detection
+#'   \item Strict positivity constraint (all values must be > 0)
+#'   \item Presence of an \code{Age} column (required for age heaping analysis)
+#' }
+#' Each validation is conducted within levels of \code{.id}.
+#' @return
+#' A data frame summarizing validation results for each group.
+#' The returned object contains:
+#' \describe{
+#'   \item{check}{Name of the validation performed}
+#'   \item{message}{Error message if the check fails, otherwise \code{NA}}
+#'   \item{pass}{Either `"Pass"` or `"Fail"`}
+#'   \item{.id}{Group identifier}
+#' }
+#' @examples
+#' library(readr)
+#' fpath       <- system.file("extdata", "single_hmd_spain.csv.gz", package = "ODAPbackend")
+#' data_in     <- read_csv(fpath, col_select = c(-1), show_col_types = FALSE)
+#' data_in     <- data_in[data_in$`.id` == 1, ]
+#' check_data_heaping(data = data_in, X = "Deaths")
+#'
+#' @export
+#' 
+check_data_heaping <- function(data, X) { 
+  
+  # Ensure '.id' column exists
+  if (!(".id" %in% names(data))) {
+    data$.id <- "all"
+  }
+  
+  # Perform checks
+  # Split data by '.id', apply checks, and combine results
+  split_data <- split(data, data$.id)
+  
+  check_one <- function(d) { 
+    
+    x      <- d[[X]]
+    checks <- c(check_numeric  = !is.numeric(x),
+                check_missing  = any(is.na(x)),
+                check_infinite = any(is.infinite(x)),
+                check_negative = any(x <= 0, na.rm = TRUE),
+                check_age      = !("Age" %in% names(d))
+    )
+    
+    messages <- c(
+      check_numeric  = sprintf("Column %s must be numeric", X),
+      check_missing  = sprintf("Column %s should not contain missing values", X),
+      check_infinite = sprintf("Column %s should not contain infinite values", X),
+      check_nonpos   = sprintf("All values in column %s must be > 0", X),
+      check_age      = "Age column is required to check age heaping"
+    )
+    
+    out <- data.frame(
+      check   = names(checks),
+      message = ifelse(checks, messages, NA_character_))
+    
+    out$pass <- ifelse(!is.na(out$message), "Fail", "Pass")
+    
+    return(out)
+    
+  }
+  
+  res <-
+    do.call(rbind, lapply(names(split_data), \(id) {
+      cbind(check_one(split_data[[id]]), .id = id)
+    }))
+  
+  return(res)
+  
+}
+
+#' Validate input data for time graduation
+#' @description
+#' Performs structural and numerical validation checks for time-series data used in graduation or smoothing procedures. The function verifies that time points are numeric, unique, sequential, and evenly spaced, and that the associated values are numeric, finite, and strictly positive.
+#' Validation is performed separately for each `.id` group. If `.id` is `NULL`, all observations are treated as belonging to a single group.
+#' @param value Numeric vector of values to be graduated (e.g., life expectancy).
+#' @param time Numeric vector of time points corresponding to `value` (e.g., calendar years).
+#' @param .id Optional grouping variable. If provided, checks are performed separately by group.
+#' @importFrom tibble tibble
+#' @importFrom rlang %||%
+#' @return
+#' A data frame summarizing validation results. Contains:
+#' \itemize{
+#'   \item `check` – name of the validation performed
+#'   \item `message` – error message if the check fails, otherwise `NA`
+#'   \item `pass` – `"Pass"` or `"Fail"`
+#'   \item `.id` – group identifier
+#' }
+#'
+#' @examples
+#' check_data_graduate_time(
+#'   value = c(70.1, 70.4, 70.8),
+#'   time  = c(2000, 2005, 2010)
+#' )
+#'
+#' @export
+#' 
+
+check_data_graduate_time <- function(value, time, .id = NULL) {
+  
+  data <- tibble(
+    value = value,
+    time  = time,
+    .id   = .id %||% "all"
+  )
+  
+  split_data <- split(data, data$.id)
+  
+  check_one <- function(d) {
+    
+    value <- d$value
+    time  <- d$time
+    
+    time_diff <- diff(sort(time))
+    
+    checks <- c(
+      check_time_numeric     = !is.numeric(time),
+      check_value_numeric    = !is.numeric(value),
+      check_time_missing     = any(is.na(time)),
+      check_value_missing    = any(is.na(value)),
+      check_time_infinite    = any(is.infinite(time)),
+      check_value_infinite   = any(is.infinite(value)),
+      check_time_positive    = any(time <= 0, na.rm = TRUE),
+      check_value_positive   = any(value <= 0, na.rm = TRUE),
+      check_time_unique      = length(time) != length(unique(time)),
+      check_time_sequential  = !all(time == sort(time)),
+      check_time_regular     = length(unique(time_diff)) > 1
+    )
+    
+    messages <- c(
+      check_time_numeric     = "Time variable must be numeric",
+      check_value_numeric    = "Value variable must be numeric",
+      check_time_missing     = "Time variable contains missing values",
+      check_value_missing    = "Value variable contains missing values",
+      check_time_infinite    = "Time variable contains infinite values",
+      check_value_infinite   = "Value variable contains infinite values",
+      check_time_positive    = "Time values must be > 0",
+      check_value_positive   = "Value values must be > 0",
+      check_time_unique      = "Time values must be unique",
+      check_time_sequential  = "Time values must be sequential and ordered",
+      check_time_regular     = "Time intervals must be regular (equal spacing)"
+    )
+    
+    out <- data.frame(
+      check   = names(checks),
+      message = ifelse(checks, messages, NA_character_)
+    )
+    
+    out$pass <- ifelse(!is.na(out$message), "Fail", "Pass")
+    
+    return(out)
+  }
+  
+  res <- do.call(
+    rbind,
+    lapply(names(split_data), function(id) {
+      cbind(check_one(split_data[[id]]), .id = id)
+    })
+  )
+  
+  return(res)
+}
+

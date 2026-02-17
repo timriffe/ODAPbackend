@@ -26,7 +26,6 @@
 #' @importFrom rlang .data %||% sym
 #' @importFrom magrittr %>% 
 #' @importFrom utils installed.packages data globalVariables
-#' @export
 #'
 #' @details
 #' The function:
@@ -47,10 +46,7 @@
 #'   \item{\code{figures}}{A named list of \code{ggplot2} objects showing original vs. redistributed populations.}
 #' }
 #'
-#' @seealso \code{\link[DemoTools]{OPAG}}, \code{\link{link[DemoTools]{lt_single_mx}}, \code{\link{\link[DemoTools]{groupAges}}
-#'
 #' @examples
-#' \dontrun{
 #' library(dplyr)
 #'
 #' data_in <- tibble(
@@ -69,7 +65,9 @@
 #'
 #' # Plot original vs redistributed population
 #' print(res$figures$India)
-#' }
+#' @export
+#' 
+
 odap_opag <- function(data_in           = NULL,
                       Age_fit           = c(60, 70),
                       AgeInt_fit        = c(10, 10),
@@ -92,8 +90,8 @@ odap_opag <- function(data_in           = NULL,
   method <- match.arg(method, c("mono", "pclm", "uniform"))
 
 
-  # Helper: conditional filtering for user defined variables
-  # e.g. if sex  exits and provided by user we use it in filtering
+  # conditional filtering for user defined variables
+  # eg if sex  exits and provided by user we use it in filtering
   conditional_filter <- function(df, col, values) {
     
     if(!is.null(values) && col %in% names(df)) {
@@ -207,7 +205,7 @@ odap_opag <- function(data_in           = NULL,
     nLx <- nLx %>%
       group_by(across(any_of(c("name", "country_code", "sex", "year")))) %>% 
       reframe(
-        lt_single_mx(nMx = .data$mx, 
+      lt_single_mx(nMx = .data$mx, 
                      Age = .data$age), .groups = "drop") %>%
       select("name", 
              "country_code", 
