@@ -227,11 +227,11 @@ smooth1d <- function(data_in,
       bs <- gsub(method, pattern = "gam-", replacement = "")
       fit <- gam(y ~ + s(x, m = smoothing_par),
                  bs = bs,
-                       data = lil_data, 
-                       weights = w, 
-                       method = "REML", 
-                       select = TRUE, 
-                       family = "gaussian")
+                 data = lil_data, 
+                 weights = w, 
+                 method = "REML", 
+                 select = TRUE, 
+                 family = "gaussian")
       pred <- predict(fit, newdata = data.frame(x = xout))
       data_out <- tibble(!!X := xout, !!Y := pred)
     }

@@ -1,3 +1,5 @@
+# TODO update this to show operations on grouped data w .id
+
 devtools::load_all()
 library(dplyr)
 

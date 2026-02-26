@@ -7,8 +7,7 @@
 check_data_lifetable(data)
 }
 \arguments{
-\item{data}{A data frame containing lifetable-related columns. Must include at least one of: \code{nMx}, \code{nlx}, \code{nqx}, \code{npx}, \code{ndx}, or \code{nLx}.
-Optionally may contain an \code{Age} column and a grouping column \code{.id}.}
+\item{data}{A data frame containing lifetable-related columns. Must include at least one of: \code{nMx}, \code{nlx}, \code{nqx}, \code{npx}, \code{ndx}, or \code{nLx}. Optionally may contain an \code{Age} column and a grouping column \code{.id}.}
 }
 \value{
 A data frame summarizing validation results for each group. The returned object contains:

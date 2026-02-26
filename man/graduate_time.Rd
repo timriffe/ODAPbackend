@@ -7,7 +7,7 @@ Expands grouped time data (e.g., 5-year intervals) into single-year values using
 \usage{
 graduate_time(
   data_in,
-  method = c("loess", "native", "cubic", "mono", "uniform", "pclm"),
+  method = c("loess", "smooth_spline", "cubic", "mono", "uniform", "pclm"),
   X,
   Y,
   timeInt = 5
@@ -16,7 +16,7 @@ graduate_time(
 \arguments{
 \item{data_in}{Data frame containing grouped time data.}
 
-\item{method}{Graduation method. One of \code{"loess"}, \code{"native"}, \code{"cubic"}, \code{"mono"}, \code{"uniform"}, \code{"pclm"}.}
+\item{method}{Graduation method. One of \code{"loess"}, \code{"smooth_spline"}, \code{"cubic"}, \code{"mono"}, \code{"uniform"}, \code{"pclm"}.}
 
 \item{X}{Name of the time variable (character string).}
 
@@ -37,7 +37,7 @@ Available methods:
 \itemize{
 \item \code{"uniform"} — distributes totals evenly within each interval
 \item \code{"mono"} — monotone cubic interpolation (Hyman filtered spline)
-\item \code{"native"} — smoothing spline via \code{stats::smooth.spline}
+\item \code{"smooth_spline"} — smoothing spline via \code{stats::smooth.spline}
 \item \code{"cubic"} — cubic regression spline via \code{mgcv::gam}
 \item \code{"loess"} — local polynomial smoothing via \code{stats::loess}
 \item \code{"pclm"} — penalized composite link model via \code{ungroup::pclm}

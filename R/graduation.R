@@ -5,7 +5,7 @@
 #' \itemize{
 #'   \item `"uniform"` — distributes totals evenly within each interval
 #'   \item `"mono"` — monotone cubic interpolation (Hyman filtered spline)
-#'   \item `"native"` — smoothing spline via \code{stats::smooth.spline}
+#'   \item `"smooth_spline"` — smoothing spline via \code{stats::smooth.spline}
 #'   \item `"cubic"` — cubic regression spline via \code{mgcv::gam}
 #'   \item `"loess"` — local polynomial smoothing via \code{stats::loess}
 #'   \item `"pclm"` — penalized composite link model via \code{ungroup::pclm}
@@ -14,7 +14,7 @@
 #' Block totals are preserved for all smoothing-based methods by rescaling
 #' predictions within each interval to match original grouped totals.
 #' @param data_in Data frame containing grouped time data.
-#' @param method Graduation method. One of \code{"loess"}, \code{"native"}, \code{"cubic"}, \code{"mono"}, \code{"uniform"}, \code{"pclm"}.
+#' @param method Graduation method. One of \code{"loess"}, \code{"smooth_spline"}, \code{"cubic"}, \code{"mono"}, \code{"uniform"}, \code{"pclm"}.
 #' @param X Name of the time variable (character string).
 #' @param Y Name of the grouped value variable (character string).
 #' @param timeInt Width of grouping interval (default = 5).
@@ -61,7 +61,7 @@
 #' 
 
 graduate_time <- function(data_in, 
-                          method = c("loess", "native", "cubic", "mono", "uniform", "pclm"),
+                          method = c("loess", "smooth_spline", "cubic", "mono", "uniform", "pclm"),
                           X,
                           Y,
                           timeInt = 5) {
@@ -218,8 +218,8 @@ graduate_time <- function(data_in,
     return(out)
   }
   
-  # native fraduation menthod (spline)
-  graduate_native_time <- function(Value, time, timeInt = 5)  { 
+  # smooth_spline graduation menthod (spline)
+  graduate_smooth_spline_time <- function(Value, time, timeInt = 5)  { 
     
     if (missing(time) & missing(timeInt)) {
       time <- names2age(Value)
@@ -291,7 +291,7 @@ graduate_time <- function(data_in,
     Value  <- d[[Y]]
     
     res <- switch(method,
-                  "native"  = graduate_native_time( Value, time, timeInt = timeInt),
+                  "smooth_spline"  = graduate_smooth_spline_time( Value, time, timeInt = timeInt),
                   "loess"   = graduate_loess_time(  Value, time, timeInt = timeInt),
                   "cubic"   = graduate_cubic_time(  Value, time, timeInt = timeInt),
                   "mono"    = graduate_mono_time(   Value, time, timeInt = timeInt),

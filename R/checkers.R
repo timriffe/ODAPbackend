@@ -621,6 +621,8 @@ check_has_numeric <- function(data) {
 #' )
 #' check_data_generic(data = data)
 #'
+# TODO: this should be a wrapper to the module-specific checkers,
+# i.e. taking a second argument (module?).
 check_data_generic <- function(data) {
 
   # Ensure '.id' column exists
@@ -1147,7 +1149,7 @@ check_data_heaping <- function(data, X) {
 #'
 #' @export
 #' 
-
+# TODO, should take a data arg rather than building a tibble
 check_data_graduate_time <- function(value, time, .id = NULL) {
   
   data <- tibble(
