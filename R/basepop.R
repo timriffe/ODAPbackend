@@ -18,8 +18,10 @@
 
 # Two main DemoTools functions to use are basepop_five() and basepop_single().
 
-remotes::install_github("timriffe/DemoTools")
+#remotes::install_github("timriffe/DemoTools")
 
+# The trick here is in showing how a user might actually practically give their
+# own inputs rather than relying on the default wpp
 
 
 
