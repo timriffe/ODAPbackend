@@ -21,7 +21,7 @@
 #remotes::install_github("timriffe/DemoTools")
 
 # The trick here is in showing how a user might actually practically give their
-# own inputs rather than relying on the default wpp
+# own inputs rather than relying on the default wpp.
 
 
 
