@@ -70,7 +70,6 @@ The function uses internal helpers such as \code{conditional_filter()},
 \code{conditional_arrange()}, and \code{create_groupid()} to standardize and align data.
 }
 \examples{
-\dontrun{
 library(dplyr)
 
 data_in <- tibble(
@@ -89,8 +88,4 @@ res$data_out$India
 
 # Plot original vs redistributed population
 print(res$figures$India)
-}
-}
-\seealso{
-\code{\link[DemoTools]{OPAG}}, \code{\link{link[DemoTools]{lt_single_mx}}, \code{\link{\link[DemoTools]{groupAges}}
 }

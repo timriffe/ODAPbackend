@@ -43,7 +43,7 @@ fpath <- system.file("extdata",
 "five_hmd_spain.csv.gz", 
 package = "ODAPbackend")
 data_in <- read_csv(fpath) |>
-  dplyr::select(-1) |>
+  select(-1) |>
   filter(.id == 1)
 
 ex1 <- graduate_auto(data_in,

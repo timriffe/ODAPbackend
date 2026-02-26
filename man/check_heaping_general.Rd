@@ -2,26 +2,55 @@
 % Please edit documentation in R/input_diagnostics.R
 \name{check_heaping_general}
 \alias{check_heaping_general}
-\title{\code{check_heaping_general}}
+\title{General age-heaping diagnostics}
 \usage{
-check_heaping_general(data, y)
+check_heaping_general(data, y, units = c("count", "rate", "proportion"))
 }
 \arguments{
-\item{data}{data.frame. User file from the read_data command with the minimum data on \code{Exposures}, \code{Death} and \code{Age}. Data can be both in 5 and 1 year age intervals}
+\item{data}{A data frame containing at least \code{Age} and the variable \code{y}. If \code{.id} is present, diagnostics are computed by group; otherwise all observations are treated as one group.}
 
-\item{y}{character.Variable name for which the heaping should be checked \code{Deaths} or \code{Exposures}.}
+\item{y}{Character string giving the name of the age-specific variable.}
+
+\item{units}{Type of input data. One of \code{"count"}, \code{"rate"}, or \code{"proportion"}.}
 }
 \value{
-A data.frame with 2 columns \code{method} - the method used for age heaping evaluation and \code{result} - the resulting heaping measure
+A data frame with one row per index and group, containing:
+\itemize{
+\item \code{method} – diagnostic index name
+\item \code{result} – numeric value
+\item \code{level} – qualitative data-quality category
+\item \code{color} – associated color code
+\item \verb{age scale} – \code{"single"} or \code{"5-year"}
+\item \code{.id} – group identifier
+}
 }
 \description{
-Check the age heaping for 5 or 1 year data.
+Computes age-heaping and age-irregularity indices from age-specific counts, rates, or proportions. The set of diagnostics depends on the age scale: digit-preference indices are used for single-year ages, while irregularity indices are used for grouped ages.
+}
+\details{
+\itemize{
+\item Single-year ages: Bachi and Myers digit-preference indices.
+\item Grouped ages: roughness and sawtooth irregularity indices.
+For \code{"count"} data, values are internally converted to proportions.
+For \code{"rate"} and \code{"proportion"} data, values are normalized to sum to one
+to ensure comparability across ages.
+}
 }
 \examples{
-\dontrun{
-check_heaping_general(
-    data = data,
-    y = "Exposures")
+library(readr)
+fpath       <- system.file("extdata", "single_hmd_spain.csv.gz", package = "ODAPbackend")
+data_in     <- read_csv(fpath, col_select = c(-1), show_col_types = FALSE)
+data_in$nMx <- data_in$Deaths / data_in$Exposures
+data_in     <- data_in[data_in$.id == 1, ]
+check_heaping_general(data = data_in, y = "Deaths", units = "count")
+check_heaping_general(data = data_in, y = "nMx", units = "rate")
 }
-
+\references{
+Bachi (1951); Myers (1940); United Nations (1955).
+}
+\seealso{
+\code{\link{check_heaping_bachi}},
+\code{\link{check_heaping_myers}},
+\code{\link{check_heaping_roughness}},
+\code{\link{check_heaping_sawtooth}}
 }

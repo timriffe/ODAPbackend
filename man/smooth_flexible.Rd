@@ -54,7 +54,7 @@ fpath <- system.file("extdata",
 "single_hmd_spain.csv.gz", 
 package = "ODAPbackend")
 data_in <- read_csv(fpath) |>
-  dplyr::select(-1)
+  select(-1)
 ex1 <- smooth_flexible(
  data_in,
  variable     = "Exposures",

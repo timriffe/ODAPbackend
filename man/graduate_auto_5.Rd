@@ -26,7 +26,7 @@ fpath <- system.file("extdata",
 "five_hmd_spain.csv.gz", 
 package = "ODAPbackend")
 data_in <- read_csv(fpath) |>
-  dplyr::select(-1) |>
+  select(-1) |>
   filter(.id == 1)
 
 graduate_auto_5(data_in, "Exposures")$Exposures
